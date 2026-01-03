@@ -18,6 +18,7 @@ interface DashboardProps {
   members: readonly string[];
   onMemberClick: (member: string) => void;
   logs: Log[];
+  onProfileSwitch?: () => void;
 }
 
 export function Dashboard({
@@ -25,6 +26,7 @@ export function Dashboard({
   members,
   onMemberClick,
   logs,
+  onProfileSwitch,
 }: DashboardProps) {
   const memberStats = React.useMemo(() => {
     return members.map((member) => {
@@ -88,6 +90,20 @@ export function Dashboard({
             </div>
           </div>
         </section>
+
+        {/* Profile Switch Button */}
+        {onProfileSwitch && (
+          <section className="px-2 -mt-6">
+            <button
+              onClick={onProfileSwitch}
+              className="w-full bg-white/40 backdrop-blur-xl rounded-2xl border border-white/60 py-3 shadow-[0_4px_16px_rgba(31,38,135,0.03)] hover:bg-white/60 transition-all cursor-pointer group"
+            >
+              <span className="text-xs text-slate-400 group-hover:text-slate-600 font-medium transition-colors">
+                프로필 전환
+              </span>
+            </button>
+          </section>
+        )}
 
         {/* Member Cards Grid - Refined Glassmorphism */}
         <section className="grid grid-cols-2 gap-4 px-2">

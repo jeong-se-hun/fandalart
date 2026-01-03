@@ -988,11 +988,9 @@ export default function Home() {
           className="text-center space-y-1.5 cursor-pointer group active:scale-95 transition-transform"
           onClick={() => setActiveTab("전체")}
         >
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tighter">
-              Fandalart
-            </h1>
-          </div>
+          <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tighter">
+            Fandalart
+          </h1>
           <p className="text-slate-400 font-bold text-xs tracking-[0.35em] flex items-center justify-center gap-2 uppercase opacity-80">
             <span className="w-6 h-[1px] bg-slate-200" />
             WISH & GROW
@@ -1002,7 +1000,7 @@ export default function Home() {
       </header>
 
       {/* Navigation Tabs - Floating Glass Style */}
-      <div className="w-fit max-w-[calc(100vw-32px)] sm:max-w-md mx-auto sticky top-4 z-50 mb-10">
+      <div className="w-fit max-w-[calc(100vw-32px)] sm:max-w-md mx-auto sticky top-4 z-50 mb-4">
         <div className="flex items-center bg-white/70 backdrop-blur-2xl rounded-full border border-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.06)] p-1">
           {/* Fixed Home Button */}
           <button
@@ -1086,6 +1084,11 @@ export default function Home() {
                 members={members.map((m) => m.nickname)}
                 onMemberClick={(member) => setActiveTab(member as TabType)}
                 logs={logs || []}
+                onProfileSwitch={() => {
+                  localStorage.removeItem("fandalart_member_id");
+                  setMyProfile(null);
+                  setShowProfileSelector(true);
+                }}
               />
             </motion.div>
           ) : (
