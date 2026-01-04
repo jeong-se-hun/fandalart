@@ -104,14 +104,14 @@ export function Cell({
   const currentProgress = hasPlans ? goal.progress : 0;
   const offset = circumference - (currentProgress / 100) * circumference;
 
-  // Check for unread comments
+  // Check for unread comments (only for goal owner)
   const hasUnreadComments = React.useMemo(() => {
     if (!goal.cheers || goal.cheers.length === 0) return false;
     if (!currentUserId) return false;
 
-    // If I'm not the owner, I don't need to see red dots for my own unread status (unless maybe I want to see replies?)
-    // Requirement: "Owner sees red dot when others comment".
-    // Also: "Don't show red dot for my own comments".
+    // Only show red dot to the goal owner
+    const isOwner = currentUserNickname && goal.owner === currentUserNickname;
+    if (!isOwner) return false;
 
     const lastViewed = goal.lastViewedAt
       ? new Date(goal.lastViewedAt).getTime()
@@ -128,7 +128,13 @@ export function Cell({
         : 0;
       return commentTime > lastViewed;
     });
-  }, [goal.cheers, goal.lastViewedAt, currentUserId]);
+  }, [
+    goal.cheers,
+    goal.lastViewedAt,
+    goal.owner,
+    currentUserId,
+    currentUserNickname,
+  ]);
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
