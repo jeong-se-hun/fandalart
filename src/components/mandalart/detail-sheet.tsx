@@ -255,6 +255,7 @@ export function DetailSheet({
     <SheetContent
       side="bottom"
       className="h-[85vh] sm:max-w-md mx-auto rounded-t-[32px] p-6 flex flex-col border-none shadow-[0_-20px_80px_rgba(0,0,0,0.1)]"
+      onOpenAutoFocus={(e) => e.preventDefault()}
     >
       <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 shrink-0" />
 

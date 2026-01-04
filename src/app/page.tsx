@@ -100,6 +100,51 @@ export default function Home() {
   }, [fetchMembers]);
 
   const [activeTab, setActiveTab] = React.useState<TabType>("전체");
+
+  // Handle tab change with history management
+  const handleTabChange = React.useCallback(
+    (newTab: TabType) => {
+      if (newTab === activeTab) return;
+
+      if (newTab === "전체") {
+        // Going to home - replace current history state
+        if (
+          typeof window !== "undefined" &&
+          window.history.state?.view === "member"
+        ) {
+          window.history.back();
+          return; // popstate will handle the state change
+        }
+      } else if (activeTab === "전체") {
+        // Home → Member: Add one history entry
+        window.history.pushState({ view: "member" }, "");
+      }
+      // Member → Member: No history change (same level)
+
+      setActiveTab(newTab);
+    },
+    [activeTab]
+  );
+
+  // Handle browser back button for tab navigation
+  React.useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      // Ignore if this is a sheet-related history change (handled by cell.tsx)
+      // Only handle tab navigation when going back from member view to home
+      if (e.state?.sheet) {
+        return; // Let cell.tsx handle sheet-related popstate
+      }
+
+      // If we're coming back from member view, go to home
+      if (!e.state?.view) {
+        setActiveTab("전체");
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
   const [goals, setGoals] = React.useState<Goal[]>([]);
 
   interface LogItem {
@@ -860,6 +905,8 @@ export default function Home() {
                   localStorage.setItem("fandalart_member_id", member.id);
                   setMyProfile(member);
                   setShowProfileSelector(false);
+                  // Add history entry for member view
+                  window.history.pushState({ view: "member" }, "");
                   setActiveTab(member.nickname);
                 }}
                 className="bg-white/60 hover:bg-white backdrop-blur-xl border border-white/60 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all text-center space-y-2 group"
@@ -920,6 +967,8 @@ export default function Home() {
                           localStorage.setItem("fandalart_member_id", data.id);
                           setMyProfile(data);
                           setShowProfileSelector(false);
+                          // Add history entry for member view
+                          window.history.pushState({ view: "member" }, "");
                           setActiveTab(data.nickname);
                           setIsAddMemberOpen(false);
                         }
@@ -986,7 +1035,7 @@ export default function Home() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-1.5 cursor-pointer group active:scale-95 transition-transform"
-          onClick={() => setActiveTab("전체")}
+          onClick={() => handleTabChange("전체")}
         >
           <h1 className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tighter">
             Fandalart
@@ -1004,7 +1053,7 @@ export default function Home() {
         <div className="flex items-center bg-white/70 backdrop-blur-2xl rounded-full border border-white/80 shadow-[0_8px_32px_rgba(0,0,0,0.06)] p-1">
           {/* Fixed Home Button */}
           <button
-            onClick={() => setActiveTab("전체")}
+            onClick={() => handleTabChange("전체")}
             className="relative z-10 w-10 h-10 flex items-center justify-center transition-all rounded-full focus:outline-none cursor-pointer group"
           >
             {activeTab === "전체" && (
@@ -1032,7 +1081,7 @@ export default function Home() {
               {members.map((member) => (
                 <button
                   key={member.id}
-                  onClick={() => setActiveTab(member.nickname)}
+                  onClick={() => handleTabChange(member.nickname)}
                   className="relative z-10 shrink-0 px-4 py-2 text-xs font-black transition-all rounded-full focus:outline-none cursor-pointer whitespace-nowrap h-8 flex items-center justify-center"
                 >
                   {activeTab === member.nickname && (
@@ -1082,7 +1131,7 @@ export default function Home() {
               <Dashboard
                 goals={goals}
                 members={members.map((m) => m.nickname)}
-                onMemberClick={(member) => setActiveTab(member as TabType)}
+                onMemberClick={(member) => handleTabChange(member as TabType)}
                 logs={logs || []}
                 onProfileSwitch={() => {
                   localStorage.removeItem("fandalart_member_id");

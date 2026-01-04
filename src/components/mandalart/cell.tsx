@@ -60,6 +60,43 @@ export function Cell({
 }: CellProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
+  // Handle browser back button to close sheet
+  React.useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      // Only close sheet if we're currently open and the new state is not a sheet state
+      if (isOpen && e.state?.sheet !== "goal-detail") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isOpen]);
+
+  // Track if we pushed a history entry for this sheet
+  const historyPushedRef = React.useRef(false);
+
+  // Handle sheet open/close with history
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      // Sheet is opening - add history entry
+      history.pushState({ sheet: "goal-detail", goalId: goal.id }, "");
+      historyPushedRef.current = true;
+      setIsOpen(true);
+      if (onGoalClick) {
+        onGoalClick(goal.id);
+      }
+    } else {
+      // Sheet is closing (via X button, overlay click, etc.)
+      setIsOpen(false);
+      // Only go back if we pushed a history entry and current state is our sheet
+      if (historyPushedRef.current && history.state?.sheet === "goal-detail") {
+        historyPushedRef.current = false;
+        history.back();
+      }
+    }
+  };
+
   // Circular Progress Logic
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
@@ -94,15 +131,7 @@ export function Cell({
   }, [goal.cheers, goal.lastViewedAt, currentUserId]);
 
   return (
-    <Sheet
-      open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (open && onGoalClick) {
-          onGoalClick(goal.id);
-        }
-      }}
-    >
+    <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
         <motion.button
           whileHover={{ scale: 0.98 }}
