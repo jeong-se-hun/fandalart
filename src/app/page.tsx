@@ -107,21 +107,23 @@ export default function Home() {
       if (newTab === activeTab) return;
 
       if (newTab === "전체") {
-        // Going to home - replace current history state
+        // Going to home - first change the tab
+        setActiveTab(newTab);
+        // Then clean up history if we have a member view entry
         if (
           typeof window !== "undefined" &&
           window.history.state?.view === "member"
         ) {
           window.history.back();
-          return; // popstate will handle the state change
         }
       } else if (activeTab === "전체") {
         // Home → Member: Add one history entry
         window.history.pushState({ view: "member" }, "");
+        setActiveTab(newTab);
+      } else {
+        // Member → Member: No history change (same level)
+        setActiveTab(newTab);
       }
-      // Member → Member: No history change (same level)
-
-      setActiveTab(newTab);
     },
     [activeTab]
   );

@@ -482,8 +482,8 @@ export function DetailSheet({
                       <span className="font-semibold text-xs">
                         {comment.member_nickname || comment.author || "익명"}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground mr-1">
+                      <div className="flex items-center">
+                        <span className="text-[10px] text-muted-foreground">
                           {comment.createdAt
                             ? new Date(comment.createdAt).toLocaleDateString()
                             : ""}
@@ -491,13 +491,37 @@ export function DetailSheet({
                         {/* Delete Button */}
                         {(comment.member_id === currentUserId ||
                           comment.author === "나") && (
-                          <button
-                            onClick={() => onDeleteComment(goal.id, comment.id)}
-                            className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                            title="삭제"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <button
+                                className="text-slate-300 hover:text-red-500 transition-colors opacity-60 sm:opacity-0 sm:group-hover:opacity-100 ml-2"
+                                title="삭제"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rounded-2xl max-w-xs">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>댓글 삭제</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  이 댓글을 삭제하시겠습니까?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="rounded-xl">
+                                  취소
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() =>
+                                    onDeleteComment(goal.id, comment.id)
+                                  }
+                                  className="rounded-xl bg-red-500 hover:bg-red-600"
+                                >
+                                  삭제
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         )}
                       </div>
                     </div>
