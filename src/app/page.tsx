@@ -294,6 +294,87 @@ export default function Home() {
     }
   }, [isAuthenticated, fetchGoals, fetchLogs]);
 
+  // Supabase Realtime subscription for live updates
+  React.useEffect(() => {
+    const groupId = localStorage.getItem("fandalart_group_id");
+    if (!isAuthenticated || !groupId) return;
+
+    // Subscribe to real-time changes
+    const channel = supabase
+      .channel("realtime-fandalart")
+      // Goals table changes
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "goals",
+        },
+        () => {
+          // Refetch all goals when any goal changes
+          fetchGoals(groupId);
+        }
+      )
+      // Comments table changes
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comments",
+        },
+        () => {
+          // Refetch goals to update comments
+          fetchGoals(groupId);
+        }
+      )
+      // Plans table changes
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "plans",
+        },
+        () => {
+          // Refetch goals to update plans
+          fetchGoals(groupId);
+        }
+      )
+      // Logs table changes
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "logs",
+        },
+        () => {
+          // Refetch logs when new log is added
+          fetchLogs(groupId);
+        }
+      )
+      // Members table changes
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "members",
+        },
+        () => {
+          // Refetch members and goals when members change
+          fetchMembers(groupId).then(() => fetchGoals(groupId));
+        }
+      )
+      .subscribe();
+
+    // Cleanup on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, fetchGoals, fetchLogs, fetchMembers]);
+
   const activeMemberGoals = React.useMemo(() => {
     if (activeTab === "전체") return [];
     return goals.filter((g) => g.owner === activeTab);
@@ -519,7 +600,8 @@ export default function Home() {
     if (!myProfile) return;
 
     // Optimistic
-    const tempId = crypto.randomUUID();
+    const tempId =
+      Math.random().toString(36).substring(2) + Date.now().toString(36);
     const newComment = {
       id: tempId,
       goal_id: goalId,
@@ -604,7 +686,8 @@ export default function Home() {
   // Plan Handlers
   const handleAddPlan = async (goalId: string, content: string) => {
     // Optimistic
-    const tempPlanId = crypto.randomUUID();
+    const tempPlanId =
+      Math.random().toString(36).substring(2) + Date.now().toString(36);
     const newPlan = {
       id: tempPlanId,
       content,
