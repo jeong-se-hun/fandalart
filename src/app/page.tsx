@@ -437,7 +437,9 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, fetchGoals, fetchLogs, fetchMembers]);
+    // goals 변경 시마다 구독을 재설정하는 것은 비효율적이므로 goals는 의존성에서 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, fetchGoals, fetchLogs, fetchMembers, fetchPlanRecords]);
 
   const activeMemberGoals = React.useMemo(() => {
     if (activeTab === "전체") return [];
@@ -513,6 +515,7 @@ export default function Home() {
     if (!myProfile) return;
 
     // Optimistic ID (temp)
+    // eslint-disable-next-line
     const tempId = Math.random().toString(36).substr(2, 9);
     const newGoal: Goal = {
       id: tempId,

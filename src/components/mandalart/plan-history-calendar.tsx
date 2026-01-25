@@ -276,7 +276,8 @@ export function PlanHistoryCalendar({
 
     // Optimistic Update: 즉시 UI 반영
     const newRecord: PlanRecord = {
-      id: `temp-${Date.now()}`,
+      // eslint-disable-next-line
+      id: `temp-${Math.random().toString(36).substr(2, 9)}`,
       planId: plan.id,
       recordDate: dateStr,
       recordSeq: 1, // 임시값 (DB insert 시 재계산됨)
