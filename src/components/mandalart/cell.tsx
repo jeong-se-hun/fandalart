@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Goal } from "@/data/goals";
+import { Goal, PlanRecord, RecurrenceSettings } from "@/data/goals";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { DetailSheet } from "./detail-sheet";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,11 @@ interface CellProps {
   categoryTitle?: string;
   onUpdate: (id: string, updates: Partial<Goal>) => void;
   onDelete: (id: string) => void;
-  onAddPlan: (goalId: string, content: string) => void;
+  onAddPlan: (
+    goalId: string,
+    content: string,
+    recurrence?: RecurrenceSettings
+  ) => void;
   onUpdatePlan: (
     goalId: string,
     planId: string,
@@ -21,12 +25,19 @@ interface CellProps {
     isCompleted: boolean
   ) => void;
   onDeletePlan: (goalId: string, planId: string) => void;
+  onUpdatePlanRecurrence?: (
+    goalId: string,
+    planId: string,
+    recurrence: RecurrenceSettings | null
+  ) => void;
   onAddComment: (goalId: string, content: string) => void;
   onDeleteComment: (goalId: string, commentId: string) => void;
   currentUserId?: string;
-  className?: string; // For positioning or overrides
+  className?: string;
   onGoalClick?: (goalId: string) => void;
   currentUserNickname?: string;
+  planRecords?: PlanRecord[];
+  onRecordsChange?: () => void;
 }
 
 const CATEGORY_COLORS = {
@@ -51,12 +62,15 @@ export function Cell({
   onAddPlan,
   onUpdatePlan,
   onDeletePlan,
+  onUpdatePlanRecurrence,
   onAddComment,
   onDeleteComment,
   currentUserId,
   className,
   onGoalClick,
   currentUserNickname,
+  planRecords = [],
+  onRecordsChange,
 }: CellProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -217,10 +231,13 @@ export function Cell({
         onAddPlan={onAddPlan}
         onUpdatePlan={onUpdatePlan}
         onDeletePlan={onDeletePlan}
+        onUpdatePlanRecurrence={onUpdatePlanRecurrence || (() => {})}
         onAddComment={onAddComment}
         onDeleteComment={onDeleteComment}
         currentUserId={currentUserId}
         currentUserNickname={currentUserNickname}
+        planRecords={planRecords}
+        onRecordsChange={onRecordsChange}
       />
     </Sheet>
   );

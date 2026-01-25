@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Goal } from "@/data/goals";
+import { Goal, PlanRecord, RecurrenceSettings } from "@/data/goals";
 import { Board } from "@/components/mandalart/board";
 import { Dashboard } from "@/components/mandalart/dashboard";
 import { Toaster } from "@/components/ui/sonner";
@@ -158,6 +158,36 @@ export default function Home() {
   }
   const [logs, setLogs] = React.useState<LogItem[]>([]);
 
+  // Plan Records 상태 (반복 계획용)
+  const [planRecords, setPlanRecords] = React.useState<PlanRecord[]>([]);
+
+  // Fetch Plan Records
+  const fetchPlanRecords = React.useCallback(async (planIds: string[]) => {
+    if (planIds.length === 0) {
+      setPlanRecords([]);
+      return;
+    }
+
+    const { data } = await supabase
+      .from("plan_records")
+      .select("*")
+      .in("plan_id", planIds);
+
+    if (data) {
+      setPlanRecords(
+        data.map((r) => ({
+          id: r.id,
+          planId: r.plan_id,
+          recordDate: r.record_date,
+          recordSeq: r.record_seq,
+          isCompleted: r.is_completed,
+          completedAt: r.completed_at,
+          createdAt: r.created_at,
+        }))
+      );
+    }
+  }, []);
+
   // Fetch Logs
   const fetchLogs = React.useCallback(async (groupId: string) => {
     const { data } = await supabase
@@ -222,7 +252,12 @@ export default function Home() {
         slot_index: number;
         title: string | null;
         progress: number;
-        plans: { id: string; content: string; is_completed: boolean }[];
+        plans: {
+          id: string;
+          content: string;
+          is_completed: boolean;
+          recurrence?: RecurrenceSettings | null;
+        }[];
         comments: {
           id: string;
           member_id: string;
@@ -251,6 +286,7 @@ export default function Home() {
             id: p.id,
             content: p.content,
             isCompleted: p.is_completed,
+            recurrence: p.recurrence || undefined,
           })),
           cheers:
             g.comments?.map((c) => ({
@@ -295,6 +331,14 @@ export default function Home() {
       fetchLogs(groupId);
     }
   }, [isAuthenticated, fetchGoals, fetchLogs]);
+
+  // Fetch plan records when goals change
+  React.useEffect(() => {
+    const planIds = goals.flatMap((g) => g.plans?.map((p) => p.id) || []);
+    if (planIds.length > 0) {
+      fetchPlanRecords(planIds);
+    }
+  }, [goals, fetchPlanRecords]);
 
   // Supabase Realtime subscription for live updates
   React.useEffect(() => {
@@ -367,6 +411,22 @@ export default function Home() {
         () => {
           // Refetch members and goals when members change
           fetchMembers(groupId).then(() => fetchGoals(groupId));
+        }
+      )
+      // Plan_records table changes (반복 계획 기록)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "plan_records",
+        },
+        () => {
+          // Refetch plan records
+          const planIds = goals.flatMap((g) => g.plans?.map((p) => p.id) || []);
+          if (planIds.length > 0) {
+            fetchPlanRecords(planIds);
+          }
         }
       )
       .subscribe();
@@ -686,7 +746,11 @@ export default function Home() {
   };
 
   // Plan Handlers
-  const handleAddPlan = async (goalId: string, content: string) => {
+  const handleAddPlan = async (
+    goalId: string,
+    content: string,
+    recurrence?: RecurrenceSettings
+  ) => {
     // Optimistic
     const tempPlanId =
       Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -694,6 +758,7 @@ export default function Home() {
       id: tempPlanId,
       content,
       isCompleted: false,
+      recurrence,
       goal_id: goalId,
     };
 
@@ -717,6 +782,7 @@ export default function Home() {
           goal_id: goalId,
           content,
           is_completed: false,
+          recurrence: recurrence || null,
         })
         .select()
         .single();
@@ -852,6 +918,35 @@ export default function Home() {
           }
         }
       }
+    }
+  };
+
+  // 계획의 반복 설정 업데이트
+  const handleUpdatePlanRecurrence = async (
+    goalId: string,
+    planId: string,
+    recurrence: RecurrenceSettings | null
+  ) => {
+    // Optimistic update
+    setGoals((prev) =>
+      prev.map((g) => {
+        if (g.id !== goalId) return g;
+        const updatedPlans =
+          g.plans?.map((p) =>
+            p.id === planId ? { ...p, recurrence: recurrence || undefined } : p
+          ) || [];
+        return { ...g, plans: updatedPlans };
+      })
+    );
+
+    // DB update
+    try {
+      await supabase
+        .from("plans")
+        .update({ recurrence: recurrence })
+        .eq("id", planId);
+    } catch {
+      console.error("Plan recurrence update failed");
     }
   };
 
@@ -1247,12 +1342,20 @@ export default function Home() {
                   onAddPlan={handleAddPlan}
                   onUpdatePlan={handleUpdatePlan}
                   onDeletePlan={handleDeletePlan}
+                  onUpdatePlanRecurrence={handleUpdatePlanRecurrence}
                   onAddComment={handleAddComment}
                   onDeleteComment={handleDeleteComment}
                   currentUserId={myProfile?.id}
                   onGoalClick={handleGoalClick}
                   currentUserNickname={myProfile?.nickname}
                   boardOwnerNickname={activeTab}
+                  planRecords={planRecords}
+                  onRecordsChange={() => {
+                    const planIds = goals.flatMap(
+                      (g) => g.plans?.map((p) => p.id) || []
+                    );
+                    if (planIds.length > 0) fetchPlanRecords(planIds);
+                  }}
                 />
 
                 {/* Individual Summary - Detailed & Refined */}
