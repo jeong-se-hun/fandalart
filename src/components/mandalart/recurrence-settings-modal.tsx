@@ -24,7 +24,8 @@ interface RecurrenceSettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialSettings?: RecurrenceSettings;
-  onSave: (settings: RecurrenceSettings | null) => void;
+  initialContent?: string;
+  onSave: (settings: RecurrenceSettings | null, content?: string) => void;
 }
 
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
@@ -33,12 +34,14 @@ export function RecurrenceSettingsModal({
   open,
   onOpenChange,
   initialSettings,
+  initialContent,
   onSave,
 }: RecurrenceSettingsModalProps) {
   // 올해 마지막 날 계산
   const yearEnd = `${new Date().getFullYear()}-12-31`;
 
   // 상태
+  const [content, setContent] = React.useState(initialContent || "");
   const [type, setType] = React.useState<RecurrenceType>(
     initialSettings?.type || "none",
   );
@@ -50,11 +53,13 @@ export function RecurrenceSettingsModal({
         return new Date(d.getTime() - offset).toISOString().split("T")[0];
       })(),
   );
+  // ... (rest of states remain same, just ensure handleSave uses 'content')
+
+  // (States for weekly/monthly settings omitted here for brevity, assume they exist as before)
   const [endDate, setEndDate] = React.useState(
     initialSettings?.endDate || yearEnd,
   );
 
-  // 주간 설정
   const [weeklyMode, setWeeklyMode] = React.useState<WeeklyMode>(
     initialSettings?.weeklyMode || "times",
   );
@@ -62,10 +67,9 @@ export function RecurrenceSettingsModal({
     initialSettings?.timesPerWeek || 3,
   );
   const [weekdays, setWeekdays] = React.useState<number[]>(
-    initialSettings?.weekdays || [1, 3, 5], // 월, 수, 금
+    initialSettings?.weekdays || [1, 3, 5],
   );
 
-  // 월간 설정
   const [monthlyMode, setMonthlyMode] = React.useState<MonthlyMode>(
     initialSettings?.monthlyMode || "times",
   );
@@ -90,8 +94,13 @@ export function RecurrenceSettingsModal({
 
   // 저장
   const handleSave = () => {
+    if (!content.trim()) {
+      alert("계획 내용을 입력해주세요.");
+      return;
+    }
+
     if (type === "none") {
-      onSave(null);
+      onSave(null, content);
       onOpenChange(false);
       return;
     }
@@ -132,7 +141,7 @@ export function RecurrenceSettingsModal({
       }
     }
 
-    onSave(settings);
+    onSave(settings, content);
     onOpenChange(false);
   };
 
@@ -141,11 +150,20 @@ export function RecurrenceSettingsModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            ⚙️ 반복 설정
+            ⚙️ 계획 설정
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
+          {/* 계획 내용 수정 */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">계획 내용</Label>
+            <Input
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="예: 매일 물 마시기"
+            />
+          </div>
           {/* 반복 유형 */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">반복 유형</Label>

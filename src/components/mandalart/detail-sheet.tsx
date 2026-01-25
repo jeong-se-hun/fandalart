@@ -102,9 +102,6 @@ function PlanItem({
   onOpenHistory: (plan: DetailPlan) => void;
   onRecordsChange: () => void;
 }) {
-  const [isEditOpen, setIsEditOpen] = React.useState(false);
-  const [editContent, setEditContent] = React.useState(plan.content);
-
   const {
     isRecurring,
     isExpired,
@@ -120,11 +117,16 @@ function PlanItem({
       case "daily":
         return "매일";
       case "weekly":
-        return plan.recurrence.weeklyMode === "times"
-          ? `주 ${plan.recurrence.timesPerWeek}회`
-          : "매주";
+        // weeklyMode가 'times'이거나, 없더라도 timesPerWeek가 있으면 횟수 모드로 간주
+        const isWeeklyTimes =
+          plan.recurrence.weeklyMode === "times" ||
+          (!plan.recurrence.weeklyMode && !!plan.recurrence.timesPerWeek);
+        return isWeeklyTimes ? `주 ${plan.recurrence.timesPerWeek}회` : "매주";
       case "monthly":
-        return plan.recurrence.monthlyMode === "times"
+        const isMonthlyTimes =
+          plan.recurrence.monthlyMode === "times" ||
+          (!plan.recurrence.monthlyMode && !!plan.recurrence.timesPerMonth);
+        return isMonthlyTimes
           ? `월 ${plan.recurrence.timesPerMonth}회`
           : "매월";
       default:
@@ -142,13 +144,6 @@ function PlanItem({
       }
     } else {
       onUpdate(plan.id, plan.content, !plan.isCompleted);
-    }
-  };
-
-  const handleSave = () => {
-    if (editContent.trim()) {
-      onUpdate(plan.id, editContent, plan.isCompleted);
-      setIsEditOpen(false);
     }
   };
 
@@ -260,28 +255,16 @@ function PlanItem({
             </Button>
           )}
 
-          {isRecurring ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary"
-              onClick={() => onEditRecurrence(plan)}
-              title="반복 설정"
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-primary"
-              onClick={() => setIsEditOpen(true)}
-              title="수정"
-              disabled={isExpired}
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-primary"
+            onClick={() => onEditRecurrence(plan)}
+            title="수정 및 설정"
+            disabled={isExpired}
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -319,28 +302,159 @@ function PlanItem({
           </AlertDialog>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {isEditOpen && !isRecurring && (
-        <div className="mt-2 flex gap-2 w-full animate-in slide-in-from-top-1">
-          <Input
-            value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            className="h-8 text-sm"
-            autoFocus
-          />
-          <Button size="sm" onClick={handleSave} className="h-8 px-3">
-            저장
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setIsEditOpen(false)}
-            className="h-8 px-3"
+function ReadOnlyPlanItem({
+  plan,
+  records,
+}: {
+  plan: DetailPlan;
+  records: PlanRecord[];
+}) {
+  const { isRecurring, subCheckItems, todayCompleted } = useRecurringPlan(
+    plan,
+    records,
+  );
+
+  const recurrenceLabel = React.useMemo(() => {
+    if (!plan.recurrence || plan.recurrence.type === "none") return null;
+    switch (plan.recurrence.type) {
+      case "daily":
+        return "매일";
+      case "weekly":
+        // weeklyMode가 'times'이거나, 없더라도 timesPerWeek가 있으면 횟수 모드로 간주
+        const isWeeklyTimes =
+          plan.recurrence.weeklyMode === "times" ||
+          (!plan.recurrence.weeklyMode && !!plan.recurrence.timesPerWeek);
+
+        return isWeeklyTimes ? `주 ${plan.recurrence.timesPerWeek}회` : "매주";
+      case "monthly":
+        const isMonthlyTimes =
+          plan.recurrence.monthlyMode === "times" ||
+          (!plan.recurrence.monthlyMode && !!plan.recurrence.timesPerMonth);
+
+        return isMonthlyTimes
+          ? `월 ${plan.recurrence.timesPerMonth}회`
+          : "매월";
+      default:
+        return null;
+    }
+  }, [plan.recurrence]);
+
+  const showMainCheckbox = !isRecurring || plan.recurrence?.type === "daily";
+
+  // 현재 달성 현황 텍스트 생성
+  const statusRun = React.useMemo(() => {
+    if (!isRecurring || !plan.recurrence) return null;
+    if (plan.recurrence.type === "daily") return null;
+
+    // 주간 횟수 모드 판별
+    const isWeeklyTimes =
+      plan.recurrence.type === "weekly" &&
+      (plan.recurrence.weeklyMode === "times" ||
+        (!plan.recurrence.weeklyMode && !!plan.recurrence.timesPerWeek));
+
+    if (isWeeklyTimes && plan.recurrence.timesPerWeek) {
+      const current = subCheckItems.filter((i) => i.isChecked).length;
+      return `${current}/${plan.recurrence.timesPerWeek}회 달성`;
+    }
+
+    // 월간 횟수 모드 판별
+    const isMonthlyTimes =
+      plan.recurrence.type === "monthly" &&
+      (plan.recurrence.monthlyMode === "times" ||
+        (!plan.recurrence.monthlyMode && !!plan.recurrence.timesPerMonth));
+
+    if (isMonthlyTimes && plan.recurrence.timesPerMonth) {
+      const current = subCheckItems.filter((i) => i.isChecked).length;
+      return `${current}/${plan.recurrence.timesPerMonth}회 달성`;
+    }
+    return null;
+  }, [isRecurring, plan.recurrence, subCheckItems]);
+
+  return (
+    <div className="flex flex-col p-3 rounded-xl border bg-card/60">
+      <div className="flex items-start space-x-3">
+        {showMainCheckbox ? (
+          <div
+            className={cn(
+              "w-5 h-5 rounded-md border shrink-0 mt-0.5 flex items-center justify-center",
+              todayCompleted
+                ? "bg-primary/20 border-primary"
+                : "border-slate-200",
+            )}
           >
-            취소
-          </Button>
+            {todayCompleted && <Check className="w-3 h-3 text-primary" />}
+          </div>
+        ) : (
+          <div className="w-5 h-5 flex items-center justify-center shrink-0 mt-0.5">
+            <Repeat className="w-4 h-4 text-muted-foreground/50" />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={cn(
+                "text-sm font-medium",
+                todayCompleted ||
+                  (subCheckItems.length > 0 &&
+                    subCheckItems.every((i) => i.isChecked))
+                  ? "text-muted-foreground line-through"
+                  : "",
+              )}
+            >
+              {plan.content}
+            </span>
+
+            {recurrenceLabel && (
+              <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                <Repeat className="w-3 h-3" />
+                {recurrenceLabel}
+              </span>
+            )}
+
+            {statusRun && (
+              <span className="text-[10px] text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded">
+                (이번 주기: {statusRun})
+              </span>
+            )}
+          </div>
+
+          {isRecurring && plan.recurrence && (
+            <div className="text-[10px] text-muted-foreground mt-0.5">
+              {plan.recurrence.startDate}
+              {plan.recurrence.endDate ? ` ~ ${plan.recurrence.endDate}` : " ~"}
+            </div>
+          )}
+
+          {/* 서브 체크박스 (Read-only) */}
+          {subCheckItems.length > 0 && (
+            <div className="flex gap-1.5 mt-2 flex-wrap opacity-80">
+              {subCheckItems.map((item) => (
+                <div
+                  key={`${item.recordDate}-${item.seq}`}
+                  title={item.label}
+                  className={cn(
+                    "w-6 h-6 rounded-md border text-[10px] font-medium flex items-center justify-center cursor-default",
+                    item.isChecked
+                      ? "bg-primary/20 text-primary border-primary"
+                      : "bg-white border-slate-200 text-slate-400",
+                  )}
+                >
+                  {item.isChecked ? (
+                    <Check className="w-3 h-3" />
+                  ) : (
+                    item.buttonLabel
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -885,76 +999,11 @@ export function DetailSheet({
                       onRecordsChange={onRecordsChange || (() => {})}
                     />
                   ) : (
-                    // Read-only plan for non-owners (반복 정보 포함)
-                    <div
+                    <ReadOnlyPlanItem
                       key={plan.id}
-                      className="flex flex-col p-3 rounded-xl border bg-card"
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div
-                          className={`w-5 h-5 rounded-md border shrink-0 mt-0.5 ${
-                            plan.isCompleted
-                              ? "bg-primary/20 border-primary"
-                              : "border-slate-200"
-                          } flex items-center justify-center`}
-                        >
-                          {plan.isCompleted && (
-                            <svg
-                              className="w-3 h-3 text-primary"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={3}
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span
-                              className={`text-sm ${
-                                plan.isCompleted
-                                  ? "text-muted-foreground line-through"
-                                  : ""
-                              }`}
-                            >
-                              {plan.content}
-                            </span>
-                            {/* 반복 라벨 표시 */}
-                            {plan.recurrence &&
-                              plan.recurrence.type !== "none" && (
-                                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                                  <Repeat className="w-3 h-3" />
-                                  {plan.recurrence.type === "daily" && "매일"}
-                                  {plan.recurrence.type === "weekly" &&
-                                    (plan.recurrence.weeklyMode === "times"
-                                      ? `주 ${plan.recurrence.timesPerWeek}회`
-                                      : "매주")}
-                                  {plan.recurrence.type === "monthly" &&
-                                    (plan.recurrence.monthlyMode === "times"
-                                      ? `월 ${plan.recurrence.timesPerMonth}회`
-                                      : "매월")}
-                                </span>
-                              )}
-                          </div>
-                          {/* 기간 표시 */}
-                          {plan.recurrence &&
-                            plan.recurrence.type !== "none" && (
-                              <div className="text-[10px] text-muted-foreground mt-0.5">
-                                {plan.recurrence.startDate}
-                                {plan.recurrence.endDate
-                                  ? ` ~ ${plan.recurrence.endDate}`
-                                  : " ~"}
-                              </div>
-                            )}
-                        </div>
-                      </div>
-                    </div>
+                      plan={plan}
+                      records={planRecords.filter((r) => r.planId === plan.id)}
+                    />
                   ),
                 )}
 
@@ -1083,13 +1132,33 @@ export function DetailSheet({
         <RecurrenceSettingsModal
           open={recurrenceModalOpen}
           onOpenChange={setRecurrenceModalOpen}
-          initialSettings={selectedPlanForRecurrence?.recurrence}
-          onSave={(recurrence) => {
+          initialSettings={
+            selectedPlanForRecurrence?.recurrence || {
+              type: "none",
+              startDate: new Date().toISOString().split("T")[0],
+              endDate: `${new Date().getFullYear()}-12-31`,
+            }
+          }
+          initialContent={selectedPlanForRecurrence?.content}
+          onSave={(settings, content) => {
             if (selectedPlanForRecurrence) {
+              // 내용 변경이 있으면 함께 업데이트
+              if (
+                content &&
+                content !== selectedPlanForRecurrence.content &&
+                content.trim()
+              ) {
+                handlePlanUpdateInternal(
+                  selectedPlanForRecurrence.id,
+                  content,
+                  selectedPlanForRecurrence.isCompleted,
+                );
+              }
+
               onUpdatePlanRecurrence(
                 goal.id,
                 selectedPlanForRecurrence.id,
-                recurrence,
+                settings,
               );
             }
             setRecurrenceModalOpen(false);
