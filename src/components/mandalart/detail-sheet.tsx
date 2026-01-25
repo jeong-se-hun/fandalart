@@ -33,8 +33,7 @@ import {
   Calendar,
   Check,
 } from "lucide-react";
-import { toast } from "sonner";
-import confetti from "canvas-confetti";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -309,9 +308,11 @@ function PlanItem({
 function ReadOnlyPlanItem({
   plan,
   records,
+  onOpenHistory,
 }: {
   plan: DetailPlan;
   records: PlanRecord[];
+  onOpenHistory: (plan: DetailPlan) => void;
 }) {
   const { isRecurring, subCheckItems, todayCompleted } = useRecurringPlan(
     plan,
@@ -420,6 +421,18 @@ function ReadOnlyPlanItem({
               <span className="text-[10px] text-green-600 font-medium bg-green-50 px-1.5 py-0.5 rounded">
                 (이번 주기: {statusRun})
               </span>
+            )}
+
+            {isRecurring && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground/50 hover:text-primary -mt-0.5"
+                onClick={() => onOpenHistory(plan)}
+                title="기록 보기"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+              </Button>
             )}
           </div>
 
@@ -764,40 +777,6 @@ export function DetailSheet({
     setIsEditTitleOpen(false);
   };
 
-  const triggerConfetti = React.useCallback(() => {
-    const duration = 3 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
-
-    const randomInRange = (min: number, max: number) => {
-      return Math.random() * (max - min) + min;
-    };
-
-    const interval: NodeJS.Timeout = setInterval(function () {
-      const timeLeft = animationEnd - Date.now();
-
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-        zIndex: 9999, // Ensure it's on top of sheet
-      });
-      confetti({
-        ...defaults,
-        particleCount,
-        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-        zIndex: 9999,
-      });
-    }, 250);
-
-    toast.success("축하합니다! 목표를 달성했습니다! 🎉 ", {});
-  }, []);
-
   const updateGoalProgress = React.useCallback(
     (overridePlans?: DetailPlan[], overrideRecords?: PlanRecord[]) => {
       const plans = overridePlans || goal.plans || [];
@@ -809,19 +788,9 @@ export function DetailSheet({
 
       if (newProgress !== goal.progress) {
         onUpdate(goal.id, { progress: newProgress });
-        if (newProgress === 100 && goal.progress !== 100) {
-          triggerConfetti();
-        }
       }
     },
-    [
-      goal.plans,
-      goal.progress,
-      goal.id,
-      planRecords,
-      onUpdate,
-      triggerConfetti,
-    ],
+    [goal.plans, goal.progress, goal.id, planRecords, onUpdate],
   );
 
   React.useEffect(() => {
@@ -1003,6 +972,10 @@ export function DetailSheet({
                       key={plan.id}
                       plan={plan}
                       records={planRecords.filter((r) => r.planId === plan.id)}
+                      onOpenHistory={(p) => {
+                        setSelectedPlanForHistory(p);
+                        setHistoryCalendarOpen(true);
+                      }}
                     />
                   ),
                 )}
@@ -1172,11 +1145,16 @@ export function DetailSheet({
         <PlanHistoryCalendar
           open={historyCalendarOpen}
           onOpenChange={setHistoryCalendarOpen}
-          plan={selectedPlanForHistory}
-          records={planRecords.filter(
-            (r) => r.planId === selectedPlanForHistory?.id,
-          )}
+          plan={selectedPlanForHistory!}
+          records={
+            selectedPlanForHistory
+              ? planRecords.filter(
+                  (r) => r.planId === selectedPlanForHistory.id,
+                )
+              : []
+          }
           onRecordsChange={onRecordsChange || (() => {})}
+          isReadOnly={!isOwner}
         />
       )}
     </SheetContent>

@@ -22,6 +22,7 @@ interface PlanHistoryCalendarProps {
   plan: DetailPlan;
   records: PlanRecord[];
   onRecordsChange: () => void; // 기록 변경 후 리프레시
+  isReadOnly?: boolean;
 }
 
 export function PlanHistoryCalendar({
@@ -30,9 +31,9 @@ export function PlanHistoryCalendar({
   plan,
   records,
   onRecordsChange,
+  isReadOnly = false,
 }: PlanHistoryCalendarProps) {
   const [currentDate, setCurrentDate] = React.useState(new Date());
-  const [isUpdating, setIsUpdating] = React.useState(false);
 
   // Optimistic UI를 위한 로컬 상태
   const [optimisticRecords, setOptimisticRecords] =
@@ -194,7 +195,7 @@ export function PlanHistoryCalendar({
     today.setHours(0, 0, 0, 0);
 
     // 미래 날짜는 클릭 불가
-    if (date > today) return;
+    if (date > today || isReadOnly) return;
 
     const dateStr = toDateStr(date);
     const existingRecords = recordMap.get(dateStr) || [];
@@ -273,8 +274,6 @@ export function PlanHistoryCalendar({
       }
     }
 
-    setIsUpdating(true);
-
     // Optimistic Update: 즉시 UI 반영
     const newRecord: PlanRecord = {
       id: `temp-${Date.now()}`,
@@ -337,8 +336,6 @@ export function PlanHistoryCalendar({
       console.error("Failed to update record:", error);
       // 에러 발생 시 롤백 (props.records로 복귀)
       setOptimisticRecords(records);
-    } finally {
-      setIsUpdating(false);
     }
   };
 
@@ -496,9 +493,9 @@ export function PlanHistoryCalendar({
               const isDisabled =
                 isFuture ||
                 isBeforeStart ||
-                isUpdating ||
                 isRestrictedByWeekday ||
-                isRestrictedByDate;
+                isRestrictedByDate ||
+                isReadOnly;
 
               const completedCount = dayRecords.filter(
                 (r) => r.isCompleted,
@@ -560,9 +557,11 @@ export function PlanHistoryCalendar({
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground text-center">
-            💡 과거 날짜를 클릭하면 기록을 수정할 수 있어요
-          </p>
+          {!isReadOnly && (
+            <p className="text-xs text-muted-foreground text-center">
+              💡 과거 날짜를 클릭하면 기록을 수정할 수 있어요
+            </p>
+          )}
         </div>
 
         <DialogFooter>

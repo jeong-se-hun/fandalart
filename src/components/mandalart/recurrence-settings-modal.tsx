@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   RecurrenceType,
   RecurrenceSettings,
@@ -95,7 +96,7 @@ export function RecurrenceSettingsModal({
   // 저장
   const handleSave = () => {
     if (!content.trim()) {
-      alert("계획 내용을 입력해주세요.");
+      toast.warning("계획 내용을 입력해주세요.");
       return;
     }
 
@@ -107,7 +108,7 @@ export function RecurrenceSettingsModal({
 
     // 시작일/종료일 필수 검증
     if (!startDate || !endDate) {
-      alert("시작일과 종료일을 모두 입력해주세요.");
+      toast.warning("시작일과 종료일을 모두 입력해주세요.");
       return;
     }
 
