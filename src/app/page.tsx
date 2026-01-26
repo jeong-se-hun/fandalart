@@ -1277,14 +1277,78 @@ export default function Home() {
 
           <div className="w-[1px] h-4 bg-slate-200/60 mx-1" />
 
-          {/* Scrollable Member List */}
+          {/* Scrollable Member List - Smooth Inertia Drag */}
           <div className="relative flex-1 overflow-hidden h-10">
-            <div className="flex overflow-x-auto no-scrollbar scroll-smooth px-1 gap-1 items-center h-full">
+            <div
+              ref={(ref) => {
+                if (!ref) return;
+                // Inertia State
+                let isDown = false;
+                let startX: number;
+                let scrollLeft: number;
+                let velX = 0;
+                let momentumID: number;
+
+                const onMouseDown = (e: MouseEvent) => {
+                  isDown = true;
+                  startX = e.pageX - ref.offsetLeft;
+                  scrollLeft = ref.scrollLeft;
+                  cancelAnimationFrame(momentumID);
+                  ref.style.cursor = "grabbing";
+                  ref.style.scrollBehavior = "auto";
+                };
+
+                const onMouseLeave = () => {
+                  isDown = false;
+                  ref.style.cursor = "grab";
+                  beginMomentum();
+                };
+
+                const onMouseUp = () => {
+                  isDown = false;
+                  ref.style.cursor = "grab";
+                  beginMomentum();
+                };
+
+                const onMouseMove = (e: MouseEvent) => {
+                  if (!isDown) return;
+                  e.preventDefault();
+                  const x = e.pageX - ref.offsetLeft;
+                  const walk = (x - startX) * 1.5; // Drag Multiplier
+                  const prevScroll = ref.scrollLeft;
+                  ref.scrollLeft = scrollLeft - walk;
+                  velX = ref.scrollLeft - prevScroll; // Calculate Velocity
+                };
+
+                // Inertia Loop
+                const beginMomentum = () => {
+                  cancelAnimationFrame(momentumID);
+                  const loop = () => {
+                    if (Math.abs(velX) < 0.5) return;
+                    velX *= 0.95; // Friction (Decay)
+                    ref.scrollLeft += velX;
+                    momentumID = requestAnimationFrame(loop);
+                  };
+                  loop();
+                };
+
+                // Remove old listeners to prevent duplication on re-render (cleanup)
+                // Note: React refs callback runs when component mounts/unmounts.
+                // For valid cleanup, usually useEffect is better, but here we use direct attachment for performance.
+                ref.onmousedown = onMouseDown as any;
+                ref.onmouseleave = onMouseLeave as any;
+                ref.onmouseup = onMouseUp as any;
+                ref.onmousemove = onMouseMove as any;
+              }}
+              className={cn(
+                "flex overflow-x-auto no-scrollbar px-1 gap-1 items-center h-full select-none cursor-grab",
+              )}
+            >
               {members.map((member) => (
                 <button
                   key={member.id}
                   onClick={() => handleTabChange(member.nickname)}
-                  className="relative z-10 shrink-0 px-4 py-2 text-xs font-black transition-all rounded-full focus:outline-none cursor-pointer whitespace-nowrap h-8 flex items-center justify-center"
+                  className="relative z-10 shrink-0 px-4 py-2 text-xs font-black transition-all rounded-full focus:outline-none cursor-pointer whitespace-nowrap h-8 flex items-center justify-center select-none"
                 >
                   {activeTab === member.nickname && (
                     <motion.div
