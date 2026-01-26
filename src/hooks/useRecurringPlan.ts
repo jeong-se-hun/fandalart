@@ -266,8 +266,30 @@ export function calculateRecurrenceRate(
 
     case "monthly":
       if (recurrence.monthlyMode === "times" && recurrence.timesPerMonth) {
-        totalExpected =
-          monthsBetween(startDate, effectiveEnd) * recurrence.timesPerMonth;
+        // 월별로 순회하며 (설정 횟수)와 (해당 월의 총 일수) 중 작은 값을 기대치로 합산
+        const current = new Date(
+          startDate.getFullYear(),
+          startDate.getMonth(),
+          1,
+        );
+        const end = new Date(
+          effectiveEnd.getFullYear(),
+          effectiveEnd.getMonth(),
+          1,
+        );
+
+        while (current <= end) {
+          const daysInMonth = new Date(
+            current.getFullYear(),
+            current.getMonth() + 1,
+            0,
+          ).getDate();
+
+          totalExpected += Math.min(recurrence.timesPerMonth, daysInMonth);
+
+          // 다음 달로 이동
+          current.setMonth(current.getMonth() + 1);
+        }
       } else if (recurrence.monthlyMode === "dates" && recurrence.monthDays) {
         totalExpected =
           monthsBetween(startDate, effectiveEnd) * recurrence.monthDays.length;

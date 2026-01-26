@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Goal, DetailPlan, PlanRecord, RecurrenceSettings } from "@/data/goals";
+import { toast } from "sonner";
 
 import {
   useRecurringPlan,
@@ -380,8 +381,9 @@ function ReadOnlyPlanItem({
       <div className="flex items-start space-x-3">
         {showMainCheckbox ? (
           <div
+            onClick={() => toast.error("작성자만 수정할 수 있습니다.")}
             className={cn(
-              "w-5 h-5 rounded-md border shrink-0 mt-0.5 flex items-center justify-center",
+              "w-5 h-5 rounded-md border shrink-0 mt-0.5 flex items-center justify-center cursor-not-allowed hover:bg-slate-50 transition-colors",
               todayCompleted
                 ? "bg-primary/20 border-primary"
                 : "border-slate-200",
@@ -450,8 +452,9 @@ function ReadOnlyPlanItem({
                 <div
                   key={`${item.recordDate}-${item.seq}`}
                   title={item.label}
+                  onClick={() => toast.error("작성자만 수정할 수 있습니다.")}
                   className={cn(
-                    "w-6 h-6 rounded-md border text-[10px] font-medium flex items-center justify-center cursor-default",
+                    "w-6 h-6 rounded-md border text-[10px] font-medium flex items-center justify-center cursor-not-allowed hover:bg-slate-50 transition-colors",
                     item.isChecked
                       ? "bg-primary/20 text-primary border-primary"
                       : "bg-white border-slate-200 text-slate-400",
@@ -471,8 +474,6 @@ function ReadOnlyPlanItem({
     </div>
   );
 }
-
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
 function AddPlanForm({
   onSubmit,
@@ -496,13 +497,8 @@ function AddPlanForm({
   const [startDate, setStartDate] = React.useState(today);
   const [endDate, setEndDate] = React.useState(yearEnd);
 
-  const [weeklyMode, setWeeklyMode] = React.useState<"times" | "days">("times");
   const [timesPerWeek, setTimesPerWeek] = React.useState(3);
-  const [weekdays, setWeekdays] = React.useState<number[]>([]);
 
-  const [monthlyMode, setMonthlyMode] = React.useState<"times" | "dates">(
-    "times",
-  );
   const [timesPerMonth, setTimesPerMonth] = React.useState(5);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -519,17 +515,11 @@ function AddPlanForm({
       };
 
       if (recurrenceType === "weekly") {
-        recurrence.weeklyMode = weeklyMode;
-        if (weeklyMode === "times") {
-          recurrence.timesPerWeek = timesPerWeek;
-        } else {
-          recurrence.weekdays = weekdays;
-        }
+        recurrence.weeklyMode = "times";
+        recurrence.timesPerWeek = Math.min(7, Math.max(1, timesPerWeek));
       } else if (recurrenceType === "monthly") {
-        recurrence.monthlyMode = monthlyMode;
-        if (monthlyMode === "times") {
-          recurrence.timesPerMonth = timesPerMonth;
-        }
+        recurrence.monthlyMode = "times";
+        recurrence.timesPerMonth = Math.min(28, Math.max(1, timesPerMonth));
       }
     }
 
@@ -540,7 +530,6 @@ function AddPlanForm({
     setIsExpanded(false);
     setStartDate(today);
     setEndDate(yearEnd);
-    setWeekdays([]);
   };
 
   return (
@@ -597,123 +586,51 @@ function AddPlanForm({
         {recurrenceType !== "none" && isExpanded && (
           <div className="pt-3 border-t border-slate-200/50 space-y-4 text-sm animate-in slide-in-from-top-2 fade-in duration-200">
             {recurrenceType === "weekly" && (
-              <div className="space-y-2">
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-1.5 cursor-pointer text-xs">
-                    <input
-                      type="radio"
-                      checked={weeklyMode === "times"}
-                      onChange={() => setWeeklyMode("times")}
-                      className="accent-primary"
-                    />
-                    횟수 지정
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer text-xs">
-                    <input
-                      type="radio"
-                      checked={weeklyMode === "days"}
-                      onChange={() => setWeeklyMode("days")}
-                      className="accent-primary"
-                    />
-                    요일 지정
-                  </label>
-                </div>
-                {weeklyMode === "times" ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">주</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={7}
-                      value={timesPerWeek}
-                      onChange={(e) => setTimesPerWeek(Number(e.target.value))}
-                      className="w-16 h-8 text-center text-xs"
-                    />
-                    <span className="text-xs">회 반복</span>
-                  </div>
-                ) : (
-                  <div className="flex gap-1 flex-wrap">
-                    {DAY_NAMES.map((day, idx) => (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => {
-                          setWeekdays((prev) =>
-                            prev.includes(idx)
-                              ? prev.filter((d) => d !== idx)
-                              : [...prev, idx],
-                          );
-                        }}
-                        className={cn(
-                          "w-7 h-7 rounded-lg text-xs font-medium transition-all border",
-                          weekdays.includes(idx)
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                            : "bg-white text-slate-500 hover:bg-slate-50 border-input",
-                        )}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs">주</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={timesPerWeek || ""}
+                  onChange={(e) => setTimesPerWeek(Number(e.target.value))}
+                  className="w-16 h-8 text-center text-xs text-black"
+                />
+                <span className="text-xs">회 반복</span>
               </div>
             )}
 
             {recurrenceType === "monthly" && (
-              <div className="space-y-2">
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-1.5 cursor-pointer text-xs">
-                    <input
-                      type="radio"
-                      checked={monthlyMode === "times"}
-                      onChange={() => setMonthlyMode("times")}
-                      className="accent-primary"
-                    />
-                    횟수 지정
-                  </label>
-                  <label
-                    className="flex items-center gap-1.5 cursor-not-allowed opacity-50 text-xs text-muted-foreground"
-                    title="준비 중"
-                  >
-                    <input
-                      type="radio"
-                      checked={monthlyMode === "dates"}
-                      disabled
-                      className="accent-primary"
-                    />
-                    날짜 지정 (준비 중)
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">월</span>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={28}
-                    value={timesPerMonth}
-                    onChange={(e) => setTimesPerMonth(Number(e.target.value))}
-                    className="w-16 h-8 text-center text-xs"
-                  />
-                  <span className="text-xs">회 반복</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs">월</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={timesPerMonth || ""}
+                  onChange={(e) => setTimesPerMonth(Number(e.target.value))}
+                  className="w-16 h-8 text-center text-xs text-black"
+                />
+                <span className="text-xs">회 반복</span>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3 pt-1">
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground">
-                  시작일
+                  시작일 <span className="text-red-400">*</span>
                 </Label>
                 <Input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  required
                   className="h-8 text-xs bg-white"
                 />
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground">
-                  종료일
+                  종료일 <span className="text-red-400">*</span>
                 </Label>
                 <Input
                   type="date"

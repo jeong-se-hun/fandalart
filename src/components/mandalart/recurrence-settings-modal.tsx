@@ -12,14 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import {
-  RecurrenceType,
-  RecurrenceSettings,
-  WeeklyMode,
-  MonthlyMode,
-} from "@/data/goals";
+import { RecurrenceType, RecurrenceSettings } from "@/data/goals";
 
 interface RecurrenceSettingsModalProps {
   open: boolean;
@@ -28,8 +22,6 @@ interface RecurrenceSettingsModalProps {
   initialContent?: string;
   onSave: (settings: RecurrenceSettings | null, content?: string) => void;
 }
-
-const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
 export function RecurrenceSettingsModal({
   open,
@@ -61,37 +53,13 @@ export function RecurrenceSettingsModal({
     initialSettings?.endDate || yearEnd,
   );
 
-  const [weeklyMode, setWeeklyMode] = React.useState<WeeklyMode>(
-    initialSettings?.weeklyMode || "times",
-  );
   const [timesPerWeek, setTimesPerWeek] = React.useState(
     initialSettings?.timesPerWeek || 3,
   );
-  const [weekdays, setWeekdays] = React.useState<number[]>(
-    initialSettings?.weekdays || [1, 3, 5],
-  );
 
-  const [monthlyMode, setMonthlyMode] = React.useState<MonthlyMode>(
-    initialSettings?.monthlyMode || "times",
-  );
   const [timesPerMonth, setTimesPerMonth] = React.useState(
     initialSettings?.timesPerMonth || 2,
   );
-  const [monthDays, setMonthDays] = React.useState<number[]>(
-    initialSettings?.monthDays || [1, 15],
-  );
-  const [monthDayInput, setMonthDayInput] = React.useState(
-    initialSettings?.monthDays?.join(", ") || "1, 15",
-  );
-
-  // 요일 토글
-  const toggleWeekday = (day: number) => {
-    if (weekdays.includes(day)) {
-      setWeekdays(weekdays.filter((d) => d !== day));
-    } else {
-      setWeekdays([...weekdays, day].sort());
-    }
-  };
 
   // 저장
   const handleSave = () => {
@@ -119,27 +87,15 @@ export function RecurrenceSettingsModal({
     };
 
     if (type === "weekly") {
-      settings.weeklyMode = weeklyMode;
-      if (weeklyMode === "times") {
-        settings.timesPerWeek = timesPerWeek;
-      } else {
-        settings.weekdays = weekdays;
-      }
+      settings.weeklyMode = "times";
+      // 저장 시 범위 제한 (1~7)
+      settings.timesPerWeek = Math.min(7, Math.max(1, timesPerWeek));
     }
 
     if (type === "monthly") {
-      settings.monthlyMode = monthlyMode;
-      if (monthlyMode === "times") {
-        settings.timesPerMonth = timesPerMonth;
-      } else {
-        // 일자 파싱
-        const days = monthDayInput
-          .split(",")
-          .map((s) => parseInt(s.trim()))
-          .filter((n) => !isNaN(n) && n >= 1 && n <= 31)
-          .sort((a, b) => a - b);
-        settings.monthDays = days.length > 0 ? days : [1];
-      }
+      settings.monthlyMode = "times";
+      // 저장 시 범위 제한 (1~28)
+      settings.timesPerMonth = Math.min(28, Math.max(1, timesPerMonth));
     }
 
     onSave(settings, content);
@@ -203,127 +159,46 @@ export function RecurrenceSettingsModal({
           {/* 주간 세부 설정 */}
           {type === "weekly" && (
             <div className="space-y-3 pl-6 border-l-2 border-primary/20">
-              <RadioGroup
-                value={weeklyMode}
-                onValueChange={(v) => setWeeklyMode(v as WeeklyMode)}
-                className="space-y-3"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="times" id="weekly-times" />
-                    <Label htmlFor="weekly-times" className="cursor-pointer">
-                      횟수
-                    </Label>
-                  </div>
-                  {weeklyMode === "times" && (
-                    <div className="flex items-center gap-2 pl-6">
-                      <span className="text-sm">주</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={7}
-                        value={timesPerWeek}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 1;
-                          setTimesPerWeek(Math.min(7, Math.max(1, val)));
-                        }}
-                        className="w-16 h-8"
-                      />
-                      <span className="text-sm">회 (최대 7회)</span>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="days" id="weekly-days" />
-                    <Label htmlFor="weekly-days" className="cursor-pointer">
-                      특정 요일
-                    </Label>
-                  </div>
-                  {weeklyMode === "days" && (
-                    <div className="flex gap-1 pl-6">
-                      {DAY_NAMES.map((name, index) => (
-                        <button
-                          key={index}
-                          type="button"
-                          onClick={() => toggleWeekday(index)}
-                          className={cn(
-                            "w-8 h-8 rounded-full text-xs font-medium transition-colors",
-                            weekdays.includes(index)
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted hover:bg-muted/80",
-                          )}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </RadioGroup>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">주</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={7}
+                  value={timesPerWeek || ""}
+                  onChange={(e) => {
+                    // 입력 중에는 자유롭게 하되, 저장 시 검증
+                    const val = parseInt(e.target.value);
+                    if (isNaN(val)) setTimesPerWeek(0);
+                    else setTimesPerWeek(val);
+                  }}
+                  className="w-16 h-8 text-black"
+                />
+                <span className="text-sm text-black">회 반복 (최대 7회)</span>
+              </div>
             </div>
           )}
 
           {/* 월간 세부 설정 */}
           {type === "monthly" && (
             <div className="space-y-3 pl-6 border-l-2 border-primary/20">
-              <RadioGroup
-                value={monthlyMode}
-                onValueChange={(v) => setMonthlyMode(v as MonthlyMode)}
-                className="space-y-3"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="times" id="monthly-times" />
-                    <Label htmlFor="monthly-times" className="cursor-pointer">
-                      횟수
-                    </Label>
-                  </div>
-                  {monthlyMode === "times" && (
-                    <div className="space-y-2 pl-6">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">월</span>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={28}
-                          value={timesPerMonth}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1;
-                            setTimesPerMonth(Math.min(28, Math.max(1, val)));
-                          }}
-                          className="w-16 h-8"
-                        />
-                        <span className="text-sm">회 (최대 28회)</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">
-                        * 횟수 모드: 해당 월 내 아무 날짜나 체크 가능
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="dates" id="monthly-dates" />
-                    <Label htmlFor="monthly-dates" className="cursor-pointer">
-                      특정 일자
-                    </Label>
-                  </div>
-                  {monthlyMode === "dates" && (
-                    <div className="pl-6">
-                      <Input
-                        placeholder="1, 15, 28"
-                        value={monthDayInput}
-                        onChange={(e) => setMonthDayInput(e.target.value)}
-                        className="h-8"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        쉼표로 구분 (예: 1, 15)
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </RadioGroup>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">월</span>
+                <Input
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={timesPerMonth || ""}
+                  onChange={(e) => {
+                    // 입력 중에는 자유롭게 하되, 저장 시 검증
+                    const val = parseInt(e.target.value);
+                    if (isNaN(val)) setTimesPerMonth(0);
+                    else setTimesPerMonth(val);
+                  }}
+                  className="w-16 h-8 text-black"
+                />
+                <span className="text-sm text-black">회 반복 (최대 28회)</span>
+              </div>
             </div>
           )}
 
@@ -334,12 +209,13 @@ export function RecurrenceSettingsModal({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">
-                    시작일
+                    시작일 <span className="text-red-400">*</span>
                   </Label>
                   <Input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
+                    required
                     className="h-9"
                   />
                 </div>

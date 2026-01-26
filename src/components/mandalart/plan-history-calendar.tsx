@@ -128,13 +128,33 @@ export function PlanHistoryCalendar({
         }
         break;
       case "monthly":
-        const months =
-          (effectiveEnd.getFullYear() - startDate.getFullYear()) * 12 +
-          (effectiveEnd.getMonth() - startDate.getMonth()) +
-          1;
         if (recurrence.monthlyMode === "times" && recurrence.timesPerMonth) {
-          total = months * recurrence.timesPerMonth;
+          // 월별 순회하며 기대 횟수 보정 (2월 등 짧은 달 고려)
+          const current = new Date(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            1,
+          );
+          const end = new Date(
+            effectiveEnd.getFullYear(),
+            effectiveEnd.getMonth(),
+            1,
+          );
+
+          while (current <= end) {
+            const daysInMonth = new Date(
+              current.getFullYear(),
+              current.getMonth() + 1,
+              0,
+            ).getDate();
+            total += Math.min(recurrence.timesPerMonth, daysInMonth);
+            current.setMonth(current.getMonth() + 1);
+          }
         } else if (recurrence.monthlyMode === "dates" && recurrence.monthDays) {
+          const months =
+            (effectiveEnd.getFullYear() - startDate.getFullYear()) * 12 +
+            (effectiveEnd.getMonth() - startDate.getMonth()) +
+            1;
           total = months * recurrence.monthDays.length;
         }
         break;
@@ -560,7 +580,7 @@ export function PlanHistoryCalendar({
 
           {!isReadOnly && (
             <p className="text-xs text-muted-foreground text-center">
-              💡 과거 날짜를 클릭하면 기록을 수정할 수 있어요
+              💡 과거 날짜를 클릭하여 기록을 수정할 수 있습니다.
             </p>
           )}
         </div>
