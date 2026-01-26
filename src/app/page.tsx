@@ -2,12 +2,14 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Goal } from "@/data/goals";
+import { Goal, PlanRecord, RecurrenceSettings } from "@/data/goals";
 import { Board } from "@/components/mandalart/board";
 import { Dashboard } from "@/components/mandalart/dashboard";
 import { Toaster } from "@/components/ui/sonner";
 import { Home as HomeIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import confetti from "canvas-confetti";
+import { toast } from "sonner";
 
 // MEMBERS mock data removed. We will fetch from DB.
 export type Member = {
@@ -34,7 +36,7 @@ import { supabase } from "@/lib/supabase";
 export default function Home() {
   // isAuthenticated: null = checking, false = not logged in, true = logged in
   const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(
-    null
+    null,
   );
   // ... (rest of the code)
 
@@ -125,7 +127,7 @@ export default function Home() {
         setActiveTab(newTab);
       }
     },
-    [activeTab]
+    [activeTab],
   );
 
   // Handle browser back button for tab navigation
@@ -158,6 +160,36 @@ export default function Home() {
   }
   const [logs, setLogs] = React.useState<LogItem[]>([]);
 
+  // Plan Records 상태 (반복 계획용)
+  const [planRecords, setPlanRecords] = React.useState<PlanRecord[]>([]);
+
+  // Fetch Plan Records
+  const fetchPlanRecords = React.useCallback(async (planIds: string[]) => {
+    if (planIds.length === 0) {
+      setPlanRecords([]);
+      return;
+    }
+
+    const { data } = await supabase
+      .from("plan_records")
+      .select("*")
+      .in("plan_id", planIds);
+
+    if (data) {
+      setPlanRecords(
+        data.map((r) => ({
+          id: r.id,
+          planId: r.plan_id,
+          recordDate: r.record_date,
+          recordSeq: r.record_seq,
+          isCompleted: r.is_completed,
+          completedAt: r.completed_at,
+          createdAt: r.created_at,
+        })),
+      );
+    }
+  }, []);
+
   // Fetch Logs
   const fetchLogs = React.useCallback(async (groupId: string) => {
     const { data } = await supabase
@@ -176,13 +208,13 @@ export default function Home() {
             log.action_type === "CREATE"
               ? "create"
               : log.action_type === "CHEER"
-              ? "cheer"
-              : log.action_type === "COMPLETE"
-              ? "achievement"
-              : "update",
+                ? "cheer"
+                : log.action_type === "COMPLETE"
+                  ? "achievement"
+                  : "update",
           message: log.target_title || "Updated",
           timestamp: log.created_at,
-        }))
+        })),
       );
     }
   }, []);
@@ -207,7 +239,7 @@ export default function Home() {
         *,
         plans (*),
         comments (*)
-      `
+      `,
       )
       .in("member_id", Array.from(memberMap.keys()));
 
@@ -222,7 +254,12 @@ export default function Home() {
         slot_index: number;
         title: string | null;
         progress: number;
-        plans: { id: string; content: string; is_completed: boolean }[];
+        plans: {
+          id: string;
+          content: string;
+          is_completed: boolean;
+          recurrence?: RecurrenceSettings | null;
+        }[];
         comments: {
           id: string;
           member_id: string;
@@ -251,6 +288,7 @@ export default function Home() {
             id: p.id,
             content: p.content,
             isCompleted: p.is_completed,
+            recurrence: p.recurrence || undefined,
           })),
           cheers:
             g.comments?.map((c) => ({
@@ -296,6 +334,14 @@ export default function Home() {
     }
   }, [isAuthenticated, fetchGoals, fetchLogs]);
 
+  // Fetch plan records when goals change
+  React.useEffect(() => {
+    const planIds = goals.flatMap((g) => g.plans?.map((p) => p.id) || []);
+    if (planIds.length > 0) {
+      fetchPlanRecords(planIds);
+    }
+  }, [goals, fetchPlanRecords]);
+
   // Supabase Realtime subscription for live updates
   React.useEffect(() => {
     const groupId = localStorage.getItem("fandalart_group_id");
@@ -315,7 +361,7 @@ export default function Home() {
         () => {
           // Refetch all goals when any goal changes
           fetchGoals(groupId);
-        }
+        },
       )
       // Comments table changes
       .on(
@@ -328,7 +374,7 @@ export default function Home() {
         () => {
           // Refetch goals to update comments
           fetchGoals(groupId);
-        }
+        },
       )
       // Plans table changes
       .on(
@@ -341,7 +387,7 @@ export default function Home() {
         () => {
           // Refetch goals to update plans
           fetchGoals(groupId);
-        }
+        },
       )
       // Logs table changes
       .on(
@@ -354,7 +400,7 @@ export default function Home() {
         () => {
           // Refetch logs when new log is added
           fetchLogs(groupId);
-        }
+        },
       )
       // Members table changes
       .on(
@@ -367,7 +413,23 @@ export default function Home() {
         () => {
           // Refetch members and goals when members change
           fetchMembers(groupId).then(() => fetchGoals(groupId));
-        }
+        },
+      )
+      // Plan_records table changes (반복 계획 기록)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "plan_records",
+        },
+        () => {
+          // Refetch plan records
+          const planIds = goals.flatMap((g) => g.plans?.map((p) => p.id) || []);
+          if (planIds.length > 0) {
+            fetchPlanRecords(planIds);
+          }
+        },
       )
       .subscribe();
 
@@ -375,7 +437,9 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, fetchGoals, fetchLogs, fetchMembers]);
+    // goals 변경 시마다 구독을 재설정하는 것은 비효율적이므로 goals는 의존성에서 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, fetchGoals, fetchLogs, fetchMembers, fetchPlanRecords]);
 
   const activeMemberGoals = React.useMemo(() => {
     if (activeTab === "전체") return [];
@@ -393,7 +457,7 @@ export default function Home() {
     // Optimistic Update
     const now = new Date().toISOString();
     setGoals((prev) =>
-      prev.map((g) => (g.id === goalId ? { ...g, lastViewedAt: now } : g))
+      prev.map((g) => (g.id === goalId ? { ...g, lastViewedAt: now } : g)),
     );
 
     try {
@@ -407,9 +471,25 @@ export default function Home() {
   };
 
   const handleGoalUpdate = async (id: string, updates: Partial<Goal>) => {
+    // 100% 달성 시 축하 효과 (Confetti & Toast)
+    if (updates.progress === 100) {
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 },
+        colors: ["#FFD700", "#FF4500", "#008080", "#FF69B4", "#7B68EE"],
+        zIndex: 9999,
+      });
+      toast.success("축하합니다! 목표를 달성했습니다! 🎉", {
+        duration: 3000,
+        className:
+          "bg-primary text-primary-foreground border-none text-lg font-bold shadow-lg",
+      });
+    }
+
     // Optimistic Update
     setGoals((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, ...updates } : g))
+      prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
     );
 
     // DB Update
@@ -423,17 +503,19 @@ export default function Home() {
         .eq("id", id);
     } catch {
       console.error("Failed to update goal");
+      toast.error("변경사항을 저장하지 못했습니다.");
     }
   };
 
   const handleAddGoal = async (
     category: Goal["category"],
     title: string,
-    slotIndex: number
+    slotIndex: number,
   ) => {
     if (!myProfile) return;
 
     // Optimistic ID (temp)
+    // eslint-disable-next-line
     const tempId = Math.random().toString(36).substr(2, 9);
     const newGoal: Goal = {
       id: tempId,
@@ -465,7 +547,7 @@ export default function Home() {
       if (data) {
         // Replace temp ID with real ID
         setGoals((prev) =>
-          prev.map((g) => (g.id === tempId ? { ...g, id: data.id } : g))
+          prev.map((g) => (g.id === tempId ? { ...g, id: data.id } : g)),
         );
 
         // Add Log
@@ -482,7 +564,7 @@ export default function Home() {
         }
       }
     } catch {
-      alert("목표 저장 실패");
+      toast.error("목표 저장에 실패했습니다.");
     }
   };
 
@@ -617,8 +699,8 @@ export default function Home() {
       prev.map((g) =>
         g.id === goalId
           ? { ...g, cheers: [...(g.cheers || []), newComment] }
-          : g
-      )
+          : g,
+      ),
     );
 
     // DB
@@ -643,10 +725,10 @@ export default function Home() {
           prev.map((g) => {
             if (g.id !== goalId) return g;
             const updatedCheers = (g.cheers || []).map((c) =>
-              c.id === tempId ? realComment : c
+              c.id === tempId ? realComment : c,
             );
             return { ...g, cheers: updatedCheers };
-          })
+          }),
         );
 
         // Add Log (CHEER)
@@ -673,8 +755,8 @@ export default function Home() {
       prev.map((g) =>
         g.id === goalId
           ? { ...g, cheers: (g.cheers || []).filter((c) => c.id !== commentId) }
-          : g
-      )
+          : g,
+      ),
     );
 
     // DB
@@ -686,7 +768,11 @@ export default function Home() {
   };
 
   // Plan Handlers
-  const handleAddPlan = async (goalId: string, content: string) => {
+  const handleAddPlan = async (
+    goalId: string,
+    content: string,
+    recurrence?: RecurrenceSettings,
+  ) => {
     // Optimistic
     const tempPlanId =
       Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -694,6 +780,7 @@ export default function Home() {
       id: tempPlanId,
       content,
       isCompleted: false,
+      recurrence,
       goal_id: goalId,
     };
 
@@ -706,7 +793,7 @@ export default function Home() {
         const completedCount = updatedPlans.filter((p) => p.isCompleted).length;
         newProgress = Math.round((completedCount / updatedPlans.length) * 100);
         return { ...g, plans: updatedPlans, progress: newProgress };
-      })
+      }),
     );
 
     // DB
@@ -717,6 +804,7 @@ export default function Home() {
           goal_id: goalId,
           content,
           is_completed: false,
+          recurrence: recurrence || null,
         })
         .select()
         .single();
@@ -728,10 +816,10 @@ export default function Home() {
             if (g.id !== goalId) return g;
             const updatedPlans =
               g.plans?.map((p) =>
-                p.id === tempPlanId ? { ...p, id: data.id } : p
+                p.id === tempPlanId ? { ...p, id: data.id } : p,
               ) || [];
             return { ...g, plans: updatedPlans };
-          })
+          }),
         );
 
         // Update Goal Progress in DB
@@ -749,7 +837,7 @@ export default function Home() {
     goalId: string,
     planId: string,
     content: string,
-    isCompleted: boolean
+    isCompleted: boolean,
   ) => {
     // Optimistic
     let newProgress = 0;
@@ -758,12 +846,12 @@ export default function Home() {
         if (g.id !== goalId) return g;
         const updatedPlans =
           g.plans?.map((p) =>
-            p.id === planId ? { ...p, content, isCompleted } : p
+            p.id === planId ? { ...p, content, isCompleted } : p,
           ) || [];
         const completedCount = updatedPlans.filter((p) => p.isCompleted).length;
         newProgress = Math.round((completedCount / updatedPlans.length) * 100);
         return { ...g, plans: updatedPlans, progress: newProgress };
-      })
+      }),
     );
 
     // DB
@@ -821,7 +909,7 @@ export default function Home() {
             ? Math.round((completedCount / updatedPlans.length) * 100)
             : 0;
         return { ...g, plans: updatedPlans, progress: newProgress };
-      })
+      }),
     );
 
     // DB
@@ -852,6 +940,35 @@ export default function Home() {
           }
         }
       }
+    }
+  };
+
+  // 계획의 반복 설정 업데이트
+  const handleUpdatePlanRecurrence = async (
+    goalId: string,
+    planId: string,
+    recurrence: RecurrenceSettings | null,
+  ) => {
+    // Optimistic update
+    setGoals((prev) =>
+      prev.map((g) => {
+        if (g.id !== goalId) return g;
+        const updatedPlans =
+          g.plans?.map((p) =>
+            p.id === planId ? { ...p, recurrence: recurrence || undefined } : p,
+          ) || [];
+        return { ...g, plans: updatedPlans };
+      }),
+    );
+
+    // DB update
+    try {
+      await supabase
+        .from("plans")
+        .update({ recurrence: recurrence })
+        .eq("id", planId);
+    } catch {
+      console.error("Plan recurrence update failed");
     }
   };
 
@@ -1153,7 +1270,7 @@ export default function Home() {
                 "w-4 h-4 transition-colors",
                 activeTab === "전체"
                   ? "text-white"
-                  : "text-slate-400 group-hover:text-slate-600"
+                  : "text-slate-400 group-hover:text-slate-600",
               )}
             />
           </button>
@@ -1185,7 +1302,7 @@ export default function Home() {
                       "transition-colors duration-300",
                       activeTab === member.nickname
                         ? "text-slate-900"
-                        : "text-slate-400"
+                        : "text-slate-400",
                     )}
                   >
                     {member.nickname}
@@ -1247,12 +1364,20 @@ export default function Home() {
                   onAddPlan={handleAddPlan}
                   onUpdatePlan={handleUpdatePlan}
                   onDeletePlan={handleDeletePlan}
+                  onUpdatePlanRecurrence={handleUpdatePlanRecurrence}
                   onAddComment={handleAddComment}
                   onDeleteComment={handleDeleteComment}
                   currentUserId={myProfile?.id}
                   onGoalClick={handleGoalClick}
                   currentUserNickname={myProfile?.nickname}
                   boardOwnerNickname={activeTab}
+                  planRecords={planRecords}
+                  onRecordsChange={() => {
+                    const planIds = goals.flatMap(
+                      (g) => g.plans?.map((p) => p.id) || [],
+                    );
+                    if (planIds.length > 0) fetchPlanRecords(planIds);
+                  }}
                 />
 
                 {/* Individual Summary - Detailed & Refined */}
@@ -1277,8 +1402,8 @@ export default function Home() {
                           {Math.round(
                             activeMemberGoals.reduce(
                               (acc, g) => acc + g.progress,
-                              0
-                            ) / 12
+                              0,
+                            ) / 12,
                           )}
                         </span>
                         <span className="text-sm font-black text-indigo-500">
@@ -1294,8 +1419,8 @@ export default function Home() {
                           width: `${Math.round(
                             activeMemberGoals.reduce(
                               (acc, g) => acc + g.progress,
-                              0
-                            ) / 12
+                              0,
+                            ) / 12,
                           )}%`,
                         }}
                         transition={{
@@ -1312,12 +1437,13 @@ export default function Home() {
                       {["cat1", "cat2", "cat3", "cat4"].map((catKey) => {
                         const catTitle = currentCategoryTitles[catKey] || "-";
                         const catGoals = activeMemberGoals.filter(
-                          (g) => g.category === catKey
+                          (g) => g.category === catKey,
                         );
                         const progress =
                           catGoals.length > 0
                             ? Math.round(
-                                catGoals.reduce((a, b) => a + b.progress, 0) / 3
+                                catGoals.reduce((a, b) => a + b.progress, 0) /
+                                  3,
                               )
                             : 0;
 

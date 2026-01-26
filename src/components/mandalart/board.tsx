@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Goal } from "@/data/goals";
+import { Goal, PlanRecord, RecurrenceSettings } from "@/data/goals";
 import { Cell } from "./cell";
 import { cn } from "@/lib/utils";
 import {
@@ -41,7 +41,11 @@ interface BoardProps {
   onCategoryRename: (key: string, newName: string) => void;
   mainTitle: string;
   onMainTitleRename: (newName: string) => void;
-  onAddPlan: (goalId: string, content: string) => void;
+  onAddPlan: (
+    goalId: string,
+    content: string,
+    recurrence?: RecurrenceSettings
+  ) => void;
   onUpdatePlan: (
     goalId: string,
     planId: string,
@@ -49,12 +53,19 @@ interface BoardProps {
     isCompleted: boolean
   ) => void;
   onDeletePlan: (goalId: string, planId: string) => void;
+  onUpdatePlanRecurrence?: (
+    goalId: string,
+    planId: string,
+    recurrence: RecurrenceSettings | null
+  ) => void;
   onAddComment: (goalId: string, content: string) => void;
   onDeleteComment: (goalId: string, commentId: string) => void;
   currentUserId?: string;
   onGoalClick: (goalId: string) => void;
   currentUserNickname?: string;
   boardOwnerNickname?: string;
+  planRecords?: PlanRecord[];
+  onRecordsChange?: () => void;
 }
 
 // Grid Indices for 4x4 (0-15)
@@ -110,12 +121,15 @@ export function Board({
   onAddPlan,
   onUpdatePlan,
   onDeletePlan,
+  onUpdatePlanRecurrence,
   onAddComment,
   onDeleteComment,
   currentUserId,
   onGoalClick,
   currentUserNickname,
   boardOwnerNickname,
+  planRecords = [],
+  onRecordsChange,
 }: BoardProps) {
   const [isMainTitleDialogOpen, setIsMainTitleDialogOpen] =
     React.useState(false);
@@ -482,11 +496,14 @@ export function Board({
                   onAddPlan={onAddPlan}
                   onUpdatePlan={onUpdatePlan}
                   onDeletePlan={onDeletePlan}
+                  onUpdatePlanRecurrence={onUpdatePlanRecurrence}
                   onAddComment={onAddComment}
                   onDeleteComment={onDeleteComment}
                   currentUserId={currentUserId}
                   onGoalClick={onGoalClick}
                   currentUserNickname={currentUserNickname}
+                  planRecords={planRecords}
+                  onRecordsChange={onRecordsChange}
                   className="bg-white/90 backdrop-blur-sm shadow-md border border-white/80 w-full h-full overflow-hidden"
                 />
               </motion.div>
