@@ -1026,7 +1026,7 @@ export default function Home() {
                     const { data, error } = await supabase
                       .from("groups")
                       .select("id, name")
-                      .eq("password", password)
+                      .eq("invite_code", password)
                       .single();
 
                     if (error || !data) {
@@ -1335,10 +1335,22 @@ export default function Home() {
                 // Remove old listeners to prevent duplication on re-render (cleanup)
                 // Note: React refs callback runs when component mounts/unmounts.
                 // For valid cleanup, usually useEffect is better, but here we use direct attachment for performance.
-                ref.onmousedown = onMouseDown as any;
-                ref.onmouseleave = onMouseLeave as any;
-                ref.onmouseup = onMouseUp as any;
-                ref.onmousemove = onMouseMove as any;
+                ref.onmousedown = onMouseDown as (
+                  this: GlobalEventHandlers,
+                  ev: MouseEvent,
+                ) => unknown;
+                ref.onmouseleave = onMouseLeave as (
+                  this: GlobalEventHandlers,
+                  ev: MouseEvent,
+                ) => unknown;
+                ref.onmouseup = onMouseUp as (
+                  this: GlobalEventHandlers,
+                  ev: MouseEvent,
+                ) => unknown;
+                ref.onmousemove = onMouseMove as (
+                  this: GlobalEventHandlers,
+                  ev: MouseEvent,
+                ) => unknown;
               }}
               className={cn(
                 "flex overflow-x-auto no-scrollbar px-1 gap-1 items-center h-full select-none cursor-grab",
